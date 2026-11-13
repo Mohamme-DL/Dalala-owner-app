@@ -137,6 +137,8 @@ const b64u=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/
 
 /* ============ الحالة والإعداد ============ */
 const CFG=window.OWNER_CONFIG||{};
+/* رابط إعداد جاهز: #setup=<base64url({u,k})> يحفظ إعدادات الخادم ثم يُمسح من العنوان */
+(function(){try{const m=/[#&]setup=([A-Za-z0-9_\-]+)/.exec(location.hash||'');if(m){const o=JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g,'+').replace(/_/g,'/')))));if(/^https:\/\//.test(o.u||'')&&String(o.k||'').length>=20){LS.set('o_url',o.u);LS.set('o_anon',o.k)}try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}}catch(e){}})();
 const S={cfg:{url:(LS.get('o_url')||CFG.url||'').replace(/\/$/,''),anon:LS.get('o_anon')||CFG.anon||''},sess:LS.get('o_sess'),stores:[],store:null,daily:[],inv:[],exp:[],vou:[],snap:{},
  tab:LS.get('o_tab','home'),period:LS.get('o_period','today'),finTab:'exp',invF:'all',q:'',loading:false,loadedAt:0,offline:false,authMode:'in',err:''};
 function applyTheme(){const h=document.documentElement,t=LS.get('o_theme','dark'),a=LS.get('o_accent','sky');h.dataset.theme=t;if(a==='sky')delete h.dataset.a;else h.dataset.a=a;const m=$('meta[name=theme-color]');if(m)m.content=t==='light'?'#eef2f8':'#070d1a'}
