@@ -58,7 +58,7 @@ async function loadStores(){S.stores=await API.json('/rest/v1/stores?select=id,n
 async function loadData(silent){if(!S.store||S.loading)return;S.loading=true;if(!silent)render();spin(true);
  const id=S.store.id,d70=ymd(addDays(new Date(),-75)),d95=ymd(addDays(new Date(),-95));
  try{const [stores,daily,inv,exp,vou,snap]=await Promise.all([API.json('/rest/v1/stores?select=id,name,currency,last_seen,created_at&order=created_at.asc'),API.all('daily',`store_id=eq.${id}&day=gte.${d70}&order=day.asc&select=*`),API.all('invoices',`store_id=eq.${id}&created_at=gte.${d95}T00:00:00&order=created_at.desc&select=*`),API.all('expenses',`store_id=eq.${id}&created_at=gte.${d95}T00:00:00&order=created_at.desc&select=*`),API.all('vouchers',`store_id=eq.${id}&created_at=gte.${d95}T00:00:00&order=created_at.desc&select=*`),API.json(`/rest/v1/snapshot?store_id=eq.${id}&select=key,data,updated_at`)]);
-  S.stores=stores;S.store=stores.find(s=>s.id===id)||S.store;S.daily=daily;S.inv=inv;S.exp=exp;S.vou=vou;S.snap={};snap.forEach(r=>S.snap[r.key]=r.data);S.snapAt=snap.map(r=>r.updated_at).sort().pop();S.offline=false;S.loadedAt=Date.now();
+  S.stores=stores;S.store=stores.find(s=>s.id===id)||S.store;S.daily=daily;S.inv=inv;S.exp=exp;S.vou=vou;S.snap={};snap.forEach(r=>S.snap[r.key]=r.data);S.snapAt=snap.map(r=>r.updated_at).sort().pop();S.totAt=((snap.find(r=>r.key==='totals')||{}).updated_at)||'';S.offline=false;S.loadedAt=Date.now();
   try{LS.set('o_cache_'+id,{daily,inv:inv.slice(0,600),exp,vou,snap:S.snap,t:S.loadedAt})}catch(e){}
  }catch(e){if(e.offline||/Failed to fetch/.test(e.message)){S.offline=true;const c=LS.get('o_cache_'+id);if(c&&!S.daily.length){S.daily=c.daily;S.inv=c.inv;S.exp=c.exp;S.vou=c.vou;S.snap=c.snap;S.loadedAt=c.t}}else if(e.status===401){S.sess=null;LS.del('o_sess')}else toast(arErr(e.message))}
  S.loading=false;spin(false);render()}
@@ -219,8 +219,16 @@ document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.target.id==='pw'|
 /* ============ التشغيل ============ */
 async function start(){if(!S.sess){render();return}try{await loadStores()}catch(e){if(e.offline){S.stores=[];const id=LS.get('o_store');if(id){S.store={id,name:LS.get('o_sname','متجري'),currency:'د.ل'}}}else if(e.status===401){S.sess=null;LS.del('o_sess')}else if(NEEDS_SCHEMA(e.message)){setupSheet()}else toast(arErr(e.message))}
  if(S.store)LS.set('o_sname',S.store.name);render();if(S.store)loadData()}
-setInterval(()=>{if(S.sess&&S.store&&!document.hidden&&Date.now()-S.loadedAt>20000)loadData(true)},10000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.sess&&S.store&&Date.now()-S.loadedAt>8000)loadData(true)});
+/* تحديث ذكي: فحص صغير جداً أولاً، ولا يُحمَّل شيء إلا إذا تغيّرت البيانات (يوفّر استهلاك الإنترنت والخادم) */
+async function probe(){if(!S.sess||!S.store||S.loading||document.hidden)return;S.lastProbe=Date.now();
+ if(Date.now()-S.loadedAt>300000||!S.totAt){loadData(true);return}
+ try{const id=S.store.id;const [sn,st]=await Promise.all([API.json(`/rest/v1/snapshot?store_id=eq.${id}&key=eq.totals&select=updated_at`),API.json(`/rest/v1/stores?id=eq.${id}&select=last_seen`)]);
+  const at=(sn&&sn[0]&&sn[0].updated_at)||'';
+  if(at!==S.totAt){loadData(true);return}
+  if(st&&st[0]&&S.store.last_seen!==st[0].last_seen){S.store.last_seen=st[0].last_seen;render()}
+ }catch(e){if(e.offline){S.offline=true}else if(e.status===401){S.sess=null;LS.del('o_sess');render()}}}
+setInterval(()=>{if(Date.now()-(S.lastProbe||0)>30000)probe()},10000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.sess&&S.store&&Date.now()-(S.lastProbe||0)>8000)probe()});
 window.addEventListener('online',()=>{if(S.sess&&S.store)loadData(true)});
 S.stores=S.sess?null:[];render();start();
 })();

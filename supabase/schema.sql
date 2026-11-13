@@ -140,6 +140,12 @@ begin
     raise exception 'unknown_table';
   end if;
   get diagnostics n = row_count;
+  -- تنظيف تلقائي: الاحتفاظ بآخر 400 يوم فقط لتوفير المساحة
+  if p_table = 'invoices' then delete from invoices where store_id = p_store and created_at < now() - interval '400 days';
+  elsif p_table = 'expenses' then delete from expenses where store_id = p_store and created_at < now() - interval '400 days';
+  elsif p_table = 'vouchers' then delete from vouchers where store_id = p_store and created_at < now() - interval '400 days';
+  elsif p_table = 'daily' then delete from daily where store_id = p_store and day < current_date - 800;
+  end if;
   return n;
 end $$;
 revoke all on function public.ping_store(uuid, text), public.push_data(uuid, text, text, jsonb, text, text, text) from public;
