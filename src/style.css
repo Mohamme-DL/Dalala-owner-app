@@ -100,3 +100,4 @@ html[data-theme=light] .code{background:#0f1b33;color:#bdeaff}
 .cu{font-size:.72em;color:var(--mut);font-weight:600;white-space:nowrap}
 .tbl td,.tbl th{text-align:start}.tbl td.num:last-child,.tbl th:last-child{text-align:end}
 .pw input{padding-left:50px!important;padding-right:14px}
+a.btn{text-decoration:none;color:var(--tx);padding:14px 16px;border-radius:14px;font-weight:700}

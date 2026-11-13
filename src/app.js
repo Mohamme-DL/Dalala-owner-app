@@ -42,6 +42,13 @@ const API={
  rpc:(fn,body)=>API.json('/rest/v1/rpc/'+fn,{method:'POST',body})
 };
 function saveSess(j){S.sess={access:j.access_token,refresh:j.refresh_token,user:{id:j.user&&j.user.id,email:j.user&&j.user.email}};LS.set('o_sess',S.sess)}
+
+const NEEDS_SCHEMA=m=>/create_store|schema cache|PGRST20\d|does not exist|Could not find the (function|table)|list_stores|stores/i.test(String(m||''))&&!/Invalid login|offline/i.test(String(m||''));
+function setupSheet(){const ref=(S.cfg.url.match(/^https:\/\/([^.]+)\./)||[])[1]||'';
+ sheet(`<div style="text-align:center"><div class="av" style="--c:var(--warn);margin:0 auto 10px;width:56px;height:56px">${I('alert')}</div><h2 style="margin:0 0 6px">قاعدة البيانات تحتاج تجهيزاً (مرة واحدة)</h2><p style="color:var(--mut);margin:0 0 12px;font-size:.9rem">لم يُجهَّز هذا المشروع بعد. الأمر يستغرق دقيقة:</p></div>
+ <ol class="steps"><li>اضغط <b>نسخ ملف الإعداد</b> أدناه.</li><li>اضغط <b>فتح SQL Editor</b> (أو افتحه من موقع Supabase).</li><li>الصق ما نسخته في المحرر ثم اضغط <b>Run</b>. تظهر كلمة Success.</li><li>ارجع هنا وأعد المحاولة.</li></ol>
+ <button class="btn pri full" data-act="copysql">${I('copy')} نسخ ملف الإعداد</button>
+ ${ref?`<a class="btn full" style="margin-top:8px;text-align:center;display:block" target="_blank" rel="noopener" href="https://supabase.com/dashboard/project/${E(ref)}/sql/new">فتح SQL Editor</a>`:''}`)}
 function arErr(m){m=String(m||'');const map=[[/Invalid login/i,'البريد أو كلمة السر غير صحيحة'],[/already registered|already been registered/i,'هذا البريد مسجّل من قبل، سجّل الدخول'],[/Password should be at least/i,'كلمة السر قصيرة (6 خانات على الأقل)'],[/valid email|invalid format|Unable to validate email/i,'اكتب بريداً إلكترونياً صحيحاً'],[/offline|Failed to fetch|NetworkError/i,'لا يوجد اتصال بالإنترنت'],[/confirm_email/,'تم إرسال رابط تأكيد إلى بريدك. افتحه ثم سجّل الدخول.'],[/rate limit/i,'محاولات كثيرة، انتظر قليلاً ثم أعد المحاولة'],[/too_many_stores/,'وصلت للحد الأقصى من المتاجر'],[/JWT|expired/i,'انتهت الجلسة، سجّل الدخول من جديد']];for(const [r,t] of map)if(r.test(m))return t;return m||'حدث خطأ غير متوقع'}
 
 /* ============ تحميل البيانات ============ */
@@ -197,10 +204,10 @@ const A={
  eye(_,el){const i=$('#pw');i.type=i.type==='password'?'text':'password';el.innerHTML=I(i.type==='password'?'eye':'eyeoff')},
  async auth(){const em=$('#em').value.trim(),pw=$('#pw').value;const e=$('#err'),b=$('#go');if(!em||!pw){e.textContent='اكتب البريد وكلمة السر';return}b.disabled=true;b.textContent='جارٍ…';e.textContent='';
   try{if(S.authMode==='up')await API.signUp(em,pw);else await API.signIn(em,pw);await start()}catch(x){S.err=arErr(x.message);if(x.message==='confirm_email')S.authMode='in';render()}},
- async create(){const n=$('#sn').value.trim();const e=$('#err');if(!n){e.textContent='اكتب اسم المتجر';return}try{const r=await API.rpc('create_store',{p_name:n});const row=Array.isArray(r)?r[0]:r;await loadStores();render();codeSheet(row.store_id,row.secret,'تم إنشاء المتجر');loadData(true)}catch(x){e.textContent=arErr(x.message)}},
- async newstore(){const n=prompt('اسم المتجر الجديد');if(!n)return;try{const r=await API.rpc('create_store',{p_name:n});const row=Array.isArray(r)?r[0]:r;await loadStores();const id=row.store_id;S.store=S.stores.find(s=>s.id===id);LS.set('o_store',id);S.daily=[];S.inv=[];S.exp=[];S.vou=[];S.snap={};render();codeSheet(id,row.secret,'تم إنشاء المتجر');loadData(true)}catch(x){toast(arErr(x.message))}},
+ async create(){const n=$('#sn').value.trim();const e=$('#err');if(!n){e.textContent='اكتب اسم المتجر';return}try{const r=await API.rpc('create_store',{p_name:n});const row=Array.isArray(r)?r[0]:r;await loadStores();render();codeSheet(row.store_id,row.secret,'تم إنشاء المتجر');loadData(true)}catch(x){if(NEEDS_SCHEMA(x.message)){e.textContent='';setupSheet()}else e.textContent=arErr(x.message)}},
+ async newstore(){const n=prompt('اسم المتجر الجديد');if(!n)return;try{const r=await API.rpc('create_store',{p_name:n});const row=Array.isArray(r)?r[0]:r;await loadStores();const id=row.store_id;S.store=S.stores.find(s=>s.id===id);LS.set('o_store',id);S.daily=[];S.inv=[];S.exp=[];S.vou=[];S.snap={};render();codeSheet(id,row.secret,'تم إنشاء المتجر');loadData(true)}catch(x){if(NEEDS_SCHEMA(x.message))setupSheet();else toast(arErr(x.message))}},
  async rotate(){if(!confirm('سيُبطَل رمز الربط الحالي وتتوقف المنظومة عن الرفع حتى تُدخل الرمز الجديد. متابعة؟'))return;try{const s=await API.rpc('rotate_secret',{p_store:S.store.id});codeSheet(S.store.id,s,'رمز الربط الجديد')}catch(x){toast(arErr(x.message))}},
- copycode(v){copy(v)},sharecode(v){navigator.share({title:'رمز ربط دلالة',text:v}).catch(()=>{})},closesheet(){closeSheet()},
+ copycode(v){copy(v)},copysql(){copy(window.SCHEMA_SQL||'');toast('تم نسخ ملف الإعداد')},sharecode(v){navigator.share({title:'رمز ربط دلالة',text:v}).catch(()=>{})},closesheet(){closeSheet()},
  savecfg(){const u=$('#su').value.trim().replace(/\/$/,''),k=$('#sk').value.trim();if(!/^https:\/\/.+/.test(u)||k.length<20){$('#err').textContent='تأكد من الرابط (يبدأ بـ https://) والمفتاح';return}S.cfg={url:u,anon:k};LS.set('o_url',u);LS.set('o_anon',k);render()},
  resetcfg(){LS.del('o_url');LS.del('o_anon');S.cfg={url:CFG.url||'',anon:CFG.anon||''};render()}
 };
@@ -208,7 +215,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.target.id==='pw'||e.target.id==='em')&&$('#go'))A.auth()});
 
 /* ============ التشغيل ============ */
-async function start(){if(!S.sess){render();return}try{await loadStores()}catch(e){if(e.offline){S.stores=[];const id=LS.get('o_store');if(id){S.store={id,name:LS.get('o_sname','متجري'),currency:'د.ل'}}}else if(e.status===401){S.sess=null;LS.del('o_sess')}else toast(arErr(e.message))}
+async function start(){if(!S.sess){render();return}try{await loadStores()}catch(e){if(e.offline){S.stores=[];const id=LS.get('o_store');if(id){S.store={id,name:LS.get('o_sname','متجري'),currency:'د.ل'}}}else if(e.status===401){S.sess=null;LS.del('o_sess')}else if(NEEDS_SCHEMA(e.message)){setupSheet()}else toast(arErr(e.message))}
  if(S.store)LS.set('o_sname',S.store.name);render();if(S.store)loadData()}
 setInterval(()=>{if(S.sess&&S.store&&!document.hidden&&Date.now()-S.loadedAt>20000)loadData(true)},10000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.sess&&S.store&&Date.now()-S.loadedAt>8000)loadData(true)});

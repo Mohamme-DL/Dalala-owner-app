@@ -18,6 +18,7 @@ html=f'''<!DOCTYPE html>
 {rd('src/style.css')}</style></head>
 <body><div id="root"></div>
 <script>window.OWNER_CONFIG={json.dumps(cfg)};</script>
+<script>window.SCHEMA_SQL={json.dumps(rd('supabase/schema.sql'))};</script>
 <script>{rd('src/app.js')}</script></body></html>'''
 os.makedirs(os.path.join(R,'www'),exist_ok=True)
 open(os.path.join(R,'www/index.html'),'w',encoding='utf-8').write(html)
