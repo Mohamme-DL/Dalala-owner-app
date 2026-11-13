@@ -1,0 +1,54 @@
+name: Owner app (Android APK + iOS)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['www/**', 'capacitor.config.json', '.github/workflows/owner-app.yml']
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - name: Build debug APK (fixed signing key)
+        run: |
+          npm install
+          npx cap add android
+          npx cap sync android
+          printf '\nandroid { signingConfigs { debug { storeFile file("../../debug.keystore"); storePassword "android"; keyAlias "androiddebugkey"; keyPassword "android" } } }\n' >> android/app/build.gradle
+          cd android && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with: { name: Dalala-Owner-Android-APK, path: android/app/build/outputs/apk/debug/app-debug.apk }
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Build unsigned iOS app
+        run: |
+          npm install
+          npx cap add ios
+          npx cap sync ios
+          cd ios/App
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+          mkdir -p Payload && cp -R build/Build/Products/Release-iphoneos/App.app Payload/ && zip -qr Dalala-Owner-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with: { name: Dalala-Owner-iOS-unsigned-IPA, path: ios/App/Dalala-Owner-unsigned.ipa }
+  release:
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: out }
+      - name: Publish files to a GitHub release
+        env: { GH_TOKEN: '${{ github.token }}', GH_REPO: '${{ github.repository }}' }
+        run: |
+          mv out/Dalala-Owner-Android-APK/app-debug.apk Dalala-Owner-Android.apk
+          mv out/Dalala-Owner-iOS-unsigned-IPA/Dalala-Owner-unsigned.ipa Dalala-Owner-iOS-unsigned.ipa
+          gh release delete owner-app -y --cleanup-tag || true
+          gh release create owner-app Dalala-Owner-Android.apk Dalala-Owner-iOS-unsigned.ipa --title "تطبيق مالك دلالة (أندرويد + iOS)" --notes "APK لأندرويد. وملف IPA لـ iOS غير موقّع." --prerelease

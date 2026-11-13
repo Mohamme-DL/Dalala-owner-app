@@ -1,0 +1,1 @@
+{"name":"dalala-owner","version":"1.0.0","private":true,"description":"Dalala owner app (Android / iOS)","dependencies":{"@capacitor/android":"^6.1.2","@capacitor/cli":"^6.1.2","@capacitor/core":"^6.1.2","@capacitor/ios":"^6.1.2"}}
